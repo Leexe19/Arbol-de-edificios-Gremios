@@ -97,7 +97,7 @@
     .modal-content { background: var(--modal-bg); padding: 2rem; border-radius: 1.5rem; width: 450px; max-width: 90%; color: var(--text-primary); }
     .modal-content input, .modal-content textarea, .modal-content select { width: 100%; margin: 0.5rem 0; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--input-border); background: var(--bg-card); color: var(--text-primary); }
     .hidden { display: none; }
-    /* Tooltip flotante (se añade al body) */
+    /* Tooltip flotante */
     .floating-tooltip {
       position: fixed;
       background-color: var(--tooltip-bg);
@@ -215,16 +215,13 @@
     tooltip.innerHTML = content;
     document.body.appendChild(tooltip);
     currentTooltip = tooltip;
-    // Posicionar después de añadirlo para poder medir
     const rect = targetElement.getBoundingClientRect();
     const tooltipRect = tooltip.getBoundingClientRect();
-    let top = rect.bottom + 8; // debajo del icono
+    let top = rect.bottom + 8;
     let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
-    // Ajuste vertical: si no cabe debajo, poner arriba
     if (top + tooltipRect.height > window.innerHeight) {
       top = rect.top - tooltipRect.height - 8;
     }
-    // Ajuste horizontal: evitar que se salga por los bordes
     if (left < 8) left = 8;
     if (left + tooltipRect.width > window.innerWidth - 8) {
       left = window.innerWidth - tooltipRect.width - 8;
@@ -260,7 +257,7 @@
     guildSkills = guildSkillsRes.data || [];
     
     let rootSkill = allSkills.find(s => s.name === 'Creación del Gremio');
-    if (!rootSkill && currentRole === 'admin') {
+    if (!rootSkill && (currentRole === 'admin' || currentRole === 'editor')) {
       const { data: newRoot, error } = await supabaseClient.from('skills').insert({
         name: 'Creación del Gremio',
         description: 'Habilidad fundamental del gremio. Siempre desbloqueada.',
@@ -287,7 +284,7 @@
     if (currentGuildId && !allGuilds.some(g => g.id === currentGuildId)) currentGuildId = null;
     if (!currentGuildId && allGuilds.length > 0) currentGuildId = allGuilds[0].id;
     if (currentGuildId) renderTree(currentGuildId);
-    else document.getElementById('treeCanvas').innerHTML = '<p style="text-align:center;">No hay gremios. Crea uno como admin.</p>';
+    else document.getElementById('treeCanvas').innerHTML = '<p style="text-align:center;">No hay gremios. Crea uno como editor o admin.</p>';
   }
 
   function renderGuildList() {
@@ -434,7 +431,6 @@
       return;
     }
     
-    // Calcular bounding box de todos los nodos
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
@@ -451,7 +447,6 @@
     const canvasOffsetX = minX - margin;
     const canvasOffsetY = minY - margin;
     
-    // Generar nodos con coordenadas relativas
     let nodesHtml = '';
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
@@ -464,6 +459,16 @@
         adminButtons = `<div class="node-admin-controls">
           <button class="edit-skill" data-id="${skill.id}">✏️</button>
           <button class="delete-skill" data-id="${skill.id}">🗑️</button>
+        </div>`;
+      } else if (currentRole === 'admin' && skill.name === 'Creación del Gremio') {
+        // También permitir editar la raíz (admin)
+        adminButtons = `<div class="node-admin-controls">
+          <button class="edit-skill" data-id="${skill.id}">✏️</button>
+        </div>`;
+      } else if (currentRole === 'editor' && skill.name === 'Creación del Gremio') {
+        // El editor también puede editar la raíz
+        adminButtons = `<div class="node-admin-controls">
+          <button class="edit-skill" data-id="${skill.id}">✏️</button>
         </div>`;
       }
       let orderButtons = '';
@@ -495,7 +500,6 @@
     canvasDiv.style.height = `${canvasHeight}px`;
     canvasDiv.innerHTML = nodesHtml;
     
-    // Dibujar líneas con coordenadas relativas
     const relativePositions = new Map();
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
@@ -505,13 +509,11 @@
     }
     drawLines(relativePositions);
     
-    // Agregar eventos de tooltip flotante
+    // Tooltips
     document.querySelectorAll('.skill-node').forEach(node => {
-      // Eliminar eventos previos para evitar duplicados
       node.removeEventListener('mouseenter', node._mouseEnterHandler);
       node.removeEventListener('mouseleave', node._mouseLeaveHandler);
       const rawDesc = node.dataset.description;
-      // Reconstruir el HTML original (está escapado, así que lo desescapamos)
       const descHtml = rawDesc.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
       const handlerEnter = () => showTooltip(descHtml, node);
       const handlerLeave = () => hideTooltip();
@@ -521,7 +523,7 @@
       node._mouseLeaveHandler = handlerLeave;
     });
     
-    // Eventos toggle (editor/admin)
+    // Eventos toggle
     if (currentRole === 'editor' || currentRole === 'admin') {
       document.querySelectorAll('.skill-node').forEach(node => {
         const skillId = node.dataset.id;
@@ -545,37 +547,43 @@
       });
     }
     
-    // Admin: editar, eliminar y mover
-    if (currentRole === 'admin') {
+    // Admin y editor pueden editar habilidades (incluyendo la raíz)
+    if (currentRole === 'admin' || currentRole === 'editor') {
       document.querySelectorAll('.edit-skill').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); openSkillModal(btn.dataset.id); });
       });
-      document.querySelectorAll('.delete-skill').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const skillId = btn.dataset.id;
-          const skill = allSkills.find(s => s.id === skillId);
-          if (skill.name === 'Creación del Gremio') return alert('No se puede eliminar la raíz');
-          if (confirm('¿Eliminar habilidad? Se eliminarán también sus descendientes.')) {
-            await supabaseClient.from('skills').delete().eq('id', skillId);
-            await loadAllData();
-          }
+      // Solo admin puede eliminar habilidades (no editor)
+      if (currentRole === 'admin') {
+        document.querySelectorAll('.delete-skill').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const skillId = btn.dataset.id;
+            const skill = allSkills.find(s => s.id === skillId);
+            if (skill.name === 'Creación del Gremio') return alert('No se puede eliminar la raíz');
+            if (confirm('¿Eliminar habilidad? Se eliminarán también sus descendientes.')) {
+              await supabaseClient.from('skills').delete().eq('id', skillId);
+              await loadAllData();
+            }
+          });
         });
-      });
-      document.querySelectorAll('.move-up').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const skillId = btn.dataset.id;
-          await moveSkill(skillId, -1);
+      }
+      // Reordenamiento solo admin
+      if (currentRole === 'admin') {
+        document.querySelectorAll('.move-up').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const skillId = btn.dataset.id;
+            await moveSkill(skillId, -1);
+          });
         });
-      });
-      document.querySelectorAll('.move-down').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const skillId = btn.dataset.id;
-          await moveSkill(skillId, 1);
+        document.querySelectorAll('.move-down').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const skillId = btn.dataset.id;
+            await moveSkill(skillId, 1);
+          });
         });
-      });
+      }
     }
   }
   
@@ -594,11 +602,11 @@
     await loadAllData();
   }
 
-  // ========== MODAL HABILIDAD ==========
+  // ========== MODAL HABILIDAD (ahora la raíz es totalmente editable) ==========
   async function openSkillModal(skillId = null) {
     const isEditing = !!skillId;
     const skill = isEditing ? allSkills.find(s => s.id === skillId) : null;
-    if (isEditing && skill.name === 'Creación del Gremio') return alert('No se puede editar la raíz');
+    const isRoot = skill && skill.name === 'Creación del Gremio';
     
     const possibleParents = allSkills.filter(s => {
       if (isEditing && s.id === skillId) return false;
@@ -615,7 +623,7 @@
         <textarea id="skillDesc" placeholder="Descripción (puedes usar HTML: &lt;b&gt;negrita&lt;/b&gt;, &lt;br&gt;, &lt;ul&gt;&lt;li&gt;lista&lt;/li&gt;&lt;/ul&gt;, etc.)">${skill ? (skill.description || '') : ''}</textarea>
         <input type="text" id="skillIconUrl" placeholder="URL del icono" value="${skill ? escapeHtml(skill.icon_url || '') : ''}">
         <label>Habilidad padre (prerrequisito):</label>
-        <select id="parentSelect">
+        <select id="parentSelect" ${isRoot ? 'disabled' : ''}>
           <option value="">-- Ninguno (solo raíz) --</option>
           ${possibleParents.map(s => `<option value="${s.id}" ${skill && skill.parent_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
         </select>
@@ -632,7 +640,12 @@
       const parentId = document.getElementById('parentSelect').value || null;
       if (!name) return alert('El nombre es obligatorio');
       if (isEditing) {
-        await supabaseClient.from('skills').update({ name, description: desc, icon_url: iconUrl || null, parent_id: parentId }).eq('id', skillId);
+        // Para la raíz, permitimos cambiar nombre, descripción e icono, pero no el padre
+        const updateData = { name, description: desc, icon_url: iconUrl || null };
+        if (!isRoot) {
+          updateData.parent_id = parentId;
+        }
+        await supabaseClient.from('skills').update(updateData).eq('id', skillId);
       } else {
         let newPosition = 0;
         if (parentId) {
@@ -657,7 +670,11 @@
   }
 
   async function createGuild() {
-    if (currentRole !== 'admin') return alert('Solo admin');
+    // Ahora tanto admin como editor pueden crear gremios
+    if (currentRole !== 'admin' && currentRole !== 'editor') {
+      alert('Debes estar en modo Editor o Administrador para crear gremios.');
+      return;
+    }
     const name = prompt('Nombre del gremio:');
     if (!name) return;
     const { data: newGuild, error } = await supabaseClient.from('guilds').insert({ name }).select().single();
@@ -681,17 +698,19 @@
       document.getElementById('editorModeBtn').classList.toggle('editor-active', role === 'editor');
       document.body.classList.remove('admin-mode', 'editor-mode');
       if (role === 'admin') document.body.classList.add('admin-mode');
+      
       const addGuildBtn = document.getElementById('addGuildBtn');
       const newSkillBtn = document.getElementById('newSkillBtn');
       const adminActions = document.getElementById('adminGuildActions');
+      
       if (role === 'admin') {
         addGuildBtn.classList.remove('hidden');
         newSkillBtn.classList.remove('hidden');
         adminActions.classList.remove('hidden');
-      } else {
-        addGuildBtn.classList.add('hidden');
-        newSkillBtn.classList.add('hidden');
-        adminActions.classList.add('hidden');
+      } else if (role === 'editor') {
+        addGuildBtn.classList.remove('hidden');      // Editor puede crear gremios
+        newSkillBtn.classList.remove('hidden');     // Editor puede crear habilidades
+        adminActions.classList.add('hidden');       // No puede renombrar gremios
       }
       await loadAllData();
       return true;
@@ -707,7 +726,7 @@
   document.getElementById('addGuildBtn').addEventListener('click', createGuild);
   document.getElementById('newSkillBtn').addEventListener('click', () => openSkillModal(null));
   document.getElementById('saveGuildNameBtn').addEventListener('click', async () => {
-    if (currentRole !== 'admin') return alert('Solo admin');
+    if (currentRole !== 'admin') return alert('Solo admin puede renombrar gremios');
     const newName = document.getElementById('editGuildNameInput').value.trim();
     if (!newName || !currentGuildId) return;
     await supabaseClient.from('guilds').update({ name: newName }).eq('id', currentGuildId);
