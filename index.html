@@ -6,7 +6,7 @@
   <title>Árbol de Habilidades - Gremios</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ========== VARIABLES CSS MODO CLARO/OSCURO ========== */
+    /* ========== VARIABLES CSS ========== */
     :root {
       --bg-body: #f1f5f9;
       --bg-sidebar: #ffffff;
@@ -19,10 +19,11 @@
       --bg-card: #ffffff;
       --border-card: #e2e8f0;
       --shadow: rgba(0,0,0,0.1);
-      --tooltip-bg: #1e293b;
-      --tooltip-text: #ffffff;
+      --tooltip-bg: #ffffff;
+      --tooltip-text: #0f172a;
+      --tooltip-border: #cbd5e1;
       --icon-bg: #f1f5f9;
-      --line-color: #64748b;
+      --line-color: #94a3b8;
       --button-bg: #e2e8f0;
       --button-text: #0f172a;
       --modal-bg: #ffffff;
@@ -42,8 +43,9 @@
       --bg-card: #1e293b;
       --border-card: #334155;
       --shadow: rgba(0,0,0,0.3);
-      --tooltip-bg: #f1f5f9;
-      --tooltip-text: #0f172a;
+      --tooltip-bg: #1e293b;
+      --tooltip-text: #f1f5f9;
+      --tooltip-border: #475569;
       --icon-bg: #334155;
       --line-color: #94a3b8;
       --button-bg: #334155;
@@ -69,16 +71,22 @@
     .role-btn.admin-active { background: #8b5cf6; color: white; }
     .role-btn.editor-active { background: #3b82f6; color: white; }
     .guild-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
-    .guild-title { font-size: 1.8rem; font-weight: bold; background: linear-gradient(135deg, #1e293b, #3b82f6); background-clip: text; -webkit-background-clip: text; color: transparent; }
-    .tree-container { position: relative; background: var(--tree-bg); border-radius: 2rem; padding: 1rem; overflow: auto; flex: 1; min-height: 0; }
-    .tree-canvas { position: relative; min-height: 600px; }
+    .guild-title { font-size: 1.8rem; font-weight: bold; background: linear-gradient(135deg, #c505df, #3b82f6); background-clip: text; -webkit-background-clip: text; color: transparent; }
+    .tree-container {
+      position: relative;
+      background: var(--tree-bg);
+      border-radius: 2rem;
+      padding: 1rem;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+    .tree-canvas { position: relative; }
     .skill-node { position: absolute; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.1s; z-index: 5; }
     .skill-node img { width: 70px; height: 70px; object-fit: contain; background: var(--icon-bg); border-radius: 16px; padding: 8px; box-shadow: 0 4px 8px var(--shadow); }
     .skill-node.locked img { filter: grayscale(1) brightness(0.6); }
     .skill-node span { margin-top: 8px; font-size: 0.75rem; font-weight: 500; background: var(--button-bg); padding: 4px 10px; border-radius: 20px; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
-    .skill-node .tooltip { visibility: hidden; background-color: var(--tooltip-bg); color: var(--tooltip-text); text-align: center; border-radius: 8px; padding: 8px 12px; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: normal; min-width: 180px; max-width: 250px; font-size: 0.75rem; margin-bottom: 8px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 10; box-shadow: 0 2px 5px var(--shadow); }
-    .skill-node:hover .tooltip { visibility: visible; opacity: 1; }
-    .tooltip-desc { display: block; margin: 4px 0; }
     .node-admin-controls { position: absolute; top: -10px; right: -10px; background: var(--bg-card); border-radius: 20px; padding: 2px 6px; display: flex; gap: 4px; box-shadow: 0 1px 3px var(--shadow); }
     .node-admin-controls button { background: none; border: none; cursor: pointer; font-size: 0.7rem; color: var(--text-primary); }
     .order-controls { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: var(--bg-card); padding: 2px 6px; border-radius: 20px; box-shadow: 0 1px 2px var(--shadow); }
@@ -88,10 +96,31 @@
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
     .modal-content { background: var(--modal-bg); padding: 2rem; border-radius: 1.5rem; width: 450px; max-width: 90%; color: var(--text-primary); }
     .modal-content input, .modal-content textarea, .modal-content select { width: 100%; margin: 0.5rem 0; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--input-border); background: var(--bg-card); color: var(--text-primary); }
-    .modal-content textarea { min-height: 80px; }
-    .modal-content label { font-weight: 500; }
     .hidden { display: none; }
-    @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } }
+    /* Tooltip flotante (se añade al body) */
+    .floating-tooltip {
+      position: fixed;
+      background-color: var(--tooltip-bg);
+      color: var(--tooltip-text);
+      border: 1px solid var(--tooltip-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      max-width: 280px;
+      min-width: 180px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      z-index: 100000;
+      pointer-events: none;
+      white-space: normal;
+      word-wrap: break-word;
+      transition: opacity 0.15s;
+    }
+    .floating-tooltip strong, .floating-tooltip b { font-weight: 700; }
+    .floating-tooltip ul, .floating-tooltip ol { padding-left: 1.2rem; margin: 0.3rem 0; }
+    .floating-tooltip li { margin: 0.2rem 0; }
+    .floating-tooltip p { margin: 0.3rem 0; }
+    @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } .floating-tooltip { max-width: 220px; font-size: 0.7rem; } }
   </style>
 </head>
 <body class="dark-mode">
@@ -125,7 +154,7 @@
 </div>
 
 <script>
-  // ========== CONFIGURACIÓN SUPABASE ==========
+  // ========== CONFIGURACIÓN ==========
   const SUPABASE_URL = 'https://ssbzppeqjwftczjpgnrj.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_8wwbu9Jbo0DXeNKIrS0doQ_GPnJAWXp';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -155,7 +184,6 @@
   }
   document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
 
-  // ========== VARIABLES GLOBALES ==========
   let currentRole = 'public';
   let currentGuildId = null;
   let allGuilds = [];
@@ -170,6 +198,47 @@
       if (m === '>') return '&gt;';
       return m;
     });
+  }
+
+  // ========== TOOLTIP FLOTANTE ==========
+  let currentTooltip = null;
+  let tooltipTimeout = null;
+
+  function showTooltip(content, targetElement) {
+    if (currentTooltip) {
+      currentTooltip.remove();
+      currentTooltip = null;
+    }
+    if (tooltipTimeout) clearTimeout(tooltipTimeout);
+    const tooltip = document.createElement('div');
+    tooltip.className = 'floating-tooltip';
+    tooltip.innerHTML = content;
+    document.body.appendChild(tooltip);
+    currentTooltip = tooltip;
+    // Posicionar después de añadirlo para poder medir
+    const rect = targetElement.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    let top = rect.bottom + 8; // debajo del icono
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    // Ajuste vertical: si no cabe debajo, poner arriba
+    if (top + tooltipRect.height > window.innerHeight) {
+      top = rect.top - tooltipRect.height - 8;
+    }
+    // Ajuste horizontal: evitar que se salga por los bordes
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipRect.width - 8;
+    }
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.opacity = '1';
+  }
+
+  function hideTooltip() {
+    if (currentTooltip) {
+      currentTooltip.remove();
+      currentTooltip = null;
+    }
   }
 
   // ========== CARGAR DATOS ==========
@@ -268,7 +337,7 @@
     return isUnlocked(guildId, parentSkill.id);
   }
 
-  // ========== POSICIONAMIENTO DEL ÁRBOL ==========
+  // ========== POSICIONAMIENTO DE ÁRBOL ==========
   function calculatePositions(rootSkills, startX = 400, startY = 80, levelGapX = 220, levelGapY = 130) {
     const childrenMap = new Map();
     allSkills.forEach(skill => {
@@ -311,7 +380,6 @@
     return positions;
   }
 
-  // Dibujar líneas punteadas curvas
   function drawLines(positions) {
     const oldSvg = document.querySelector('.lines-layer');
     if (oldSvg) oldSvg.remove();
@@ -366,6 +434,24 @@
       return;
     }
     
+    // Calcular bounding box de todos los nodos
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let skill of allSkills) {
+      const pos = positions.get(skill.id);
+      if (pos) {
+        minX = Math.min(minX, pos.x);
+        maxX = Math.max(maxX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxY = Math.max(maxY, pos.y);
+      }
+    }
+    const margin = 50;
+    const canvasWidth = (maxX - minX) + 2 * margin;
+    const canvasHeight = (maxY - minY) + 2 * margin;
+    const canvasOffsetX = minX - margin;
+    const canvasOffsetY = minY - margin;
+    
+    // Generar nodos con coordenadas relativas
     let nodesHtml = '';
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
@@ -391,24 +477,49 @@
           </div>`;
         }
       }
-      // Tooltip con soporte HTML en la descripción
-      const tooltipDesc = skill.description || 'Sin descripción';
+      const relX = pos.x - canvasOffsetX;
+      const relY = pos.y - canvasOffsetY;
+      
       nodesHtml += `
-        <div class="skill-node ${lockedClass}" data-id="${skill.id}" style="left: ${pos.x}px; top: ${pos.y}px; transform: translateX(-50%);">
+        <div class="skill-node ${lockedClass}" data-id="${skill.id}" data-description="${escapeHtml(skill.description || 'Sin descripción').replace(/"/g, '&quot;')}" style="left: ${relX}px; top: ${relY}px; transform: translateX(-50%);">
           ${adminButtons}
           <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(skill.name)}">
           <span>${escapeHtml(skill.name)}</span>
-          <div class="tooltip">
-            <strong>${escapeHtml(skill.name)}</strong><br>
-            <span class="tooltip-desc">${tooltipDesc}</span><br>
-            📜 Padre: ${skill.parent_id ? (allSkills.find(s=>s.id===skill.parent_id)?.name || 'Ninguno') : 'Ninguno'}
-          </div>
           ${orderButtons}
         </div>
       `;
     }
-    document.getElementById('treeCanvas').innerHTML = nodesHtml;
-    drawLines(positions);
+    
+    const canvasDiv = document.getElementById('treeCanvas');
+    canvasDiv.style.width = `${canvasWidth}px`;
+    canvasDiv.style.height = `${canvasHeight}px`;
+    canvasDiv.innerHTML = nodesHtml;
+    
+    // Dibujar líneas con coordenadas relativas
+    const relativePositions = new Map();
+    for (let skill of allSkills) {
+      const pos = positions.get(skill.id);
+      if (pos) {
+        relativePositions.set(skill.id, { x: pos.x - canvasOffsetX, y: pos.y - canvasOffsetY });
+      }
+    }
+    drawLines(relativePositions);
+    
+    // Agregar eventos de tooltip flotante
+    document.querySelectorAll('.skill-node').forEach(node => {
+      // Eliminar eventos previos para evitar duplicados
+      node.removeEventListener('mouseenter', node._mouseEnterHandler);
+      node.removeEventListener('mouseleave', node._mouseLeaveHandler);
+      const rawDesc = node.dataset.description;
+      // Reconstruir el HTML original (está escapado, así que lo desescapamos)
+      const descHtml = rawDesc.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+      const handlerEnter = () => showTooltip(descHtml, node);
+      const handlerLeave = () => hideTooltip();
+      node.addEventListener('mouseenter', handlerEnter);
+      node.addEventListener('mouseleave', handlerLeave);
+      node._mouseEnterHandler = handlerEnter;
+      node._mouseLeaveHandler = handlerLeave;
+    });
     
     // Eventos toggle (editor/admin)
     if (currentRole === 'editor' || currentRole === 'admin') {
@@ -483,11 +594,11 @@
     await loadAllData();
   }
 
-  // ========== MODAL HABILIDAD (con soporte HTML y edición de raíz limitada) ==========
+  // ========== MODAL HABILIDAD ==========
   async function openSkillModal(skillId = null) {
     const isEditing = !!skillId;
     const skill = isEditing ? allSkills.find(s => s.id === skillId) : null;
-    const isRoot = skill && skill.name === 'Creación del Gremio';
+    if (isEditing && skill.name === 'Creación del Gremio') return alert('No se puede editar la raíz');
     
     const possibleParents = allSkills.filter(s => {
       if (isEditing && s.id === skillId) return false;
@@ -500,11 +611,11 @@
     modalDiv.innerHTML = `
       <div class="modal-content">
         <h3>${isEditing ? 'Editar habilidad' : 'Nueva habilidad'}</h3>
-        <input type="text" id="skillName" placeholder="Nombre" value="${skill ? escapeHtml(skill.name) : ''}" ${isRoot ? 'disabled' : ''}>
-        <textarea id="skillDesc" placeholder="Descripción (puedes usar HTML: &lt;b&gt;, &lt;i&gt;, etc.)">${skill ? (skill.description || '') : ''}</textarea>
+        <input type="text" id="skillName" placeholder="Nombre" value="${skill ? escapeHtml(skill.name) : ''}">
+        <textarea id="skillDesc" placeholder="Descripción (puedes usar HTML: &lt;b&gt;negrita&lt;/b&gt;, &lt;br&gt;, &lt;ul&gt;&lt;li&gt;lista&lt;/li&gt;&lt;/ul&gt;, etc.)">${skill ? (skill.description || '') : ''}</textarea>
         <input type="text" id="skillIconUrl" placeholder="URL del icono" value="${skill ? escapeHtml(skill.icon_url || '') : ''}">
         <label>Habilidad padre (prerrequisito):</label>
-        <select id="parentSelect" ${isRoot ? 'disabled' : ''}>
+        <select id="parentSelect">
           <option value="">-- Ninguno (solo raíz) --</option>
           ${possibleParents.map(s => `<option value="${s.id}" ${skill && skill.parent_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
         </select>
@@ -519,14 +630,9 @@
       const desc = document.getElementById('skillDesc').value;
       const iconUrl = document.getElementById('skillIconUrl').value.trim();
       const parentId = document.getElementById('parentSelect').value || null;
-      if (!name && !isRoot) return alert('El nombre es obligatorio');
+      if (!name) return alert('El nombre es obligatorio');
       if (isEditing) {
-        const updateData = { description: desc, icon_url: iconUrl || null };
-        if (!isRoot) {
-          updateData.name = name;
-          updateData.parent_id = parentId;
-        }
-        await supabaseClient.from('skills').update(updateData).eq('id', skillId);
+        await supabaseClient.from('skills').update({ name, description: desc, icon_url: iconUrl || null, parent_id: parentId }).eq('id', skillId);
       } else {
         let newPosition = 0;
         if (parentId) {
