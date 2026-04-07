@@ -91,7 +91,7 @@
     @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } }
   </style>
 </head>
-<body class="dark-mode"> <!-- Modo oscuro por defecto -->
+<body class="dark-mode">
 
 <div class="sidebar">
   <h2>🏰 Gremios</h2>
@@ -148,7 +148,6 @@
       localStorage.setItem('theme', 'dark');
       document.getElementById('themeToggleBtn').innerHTML = '☀️ Modo Claro';
     }
-    // Redibujar el árbol para que las líneas se ajusten (opcional, pero mejora la experiencia)
     if (currentGuildId) renderTree(currentGuildId);
   }
   document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
@@ -368,13 +367,19 @@
       const unlocked = isUnlocked(guildId, skill.id);
       const lockedClass = (!unlocked && skill.name !== 'Creación del Gremio') ? 'locked' : '';
       const iconUrl = skill.icon_url || 'https://cdn-icons-png.flaticon.com/512/1055/1055687.png';
+      
       let adminButtons = '';
-      if (currentRole === 'admin' && skill.name !== 'Creación del Gremio') {
+      if (currentRole === 'admin') {
+        // Mostrar botón de editar para todas las habilidades (incluyendo raíz)
         adminButtons = `<div class="node-admin-controls">
-          <button class="edit-skill" data-id="${skill.id}">✏️</button>
-          <button class="delete-skill" data-id="${skill.id}">🗑️</button>
-        </div>`;
+          <button class="edit-skill" data-id="${skill.id}">✏️</button>`;
+        // Solo mostrar eliminar si no es la raíz
+        if (skill.name !== 'Creación del Gremio') {
+          adminButtons += `<button class="delete-skill" data-id="${skill.id}">🗑️</button>`;
+        }
+        adminButtons += `</div>`;
       }
+      
       let orderButtons = '';
       if (currentRole === 'admin' && skill.parent_id) {
         const siblings = allSkills.filter(s => s.parent_id === skill.parent_id).sort((a,b) => (a.position||0)-(b.position||0));
@@ -386,6 +391,7 @@
           </div>`;
         }
       }
+      
       nodesHtml += `
         <div class="skill-node ${lockedClass}" data-id="${skill.id}" style="left: ${pos.x}px; top: ${pos.y}px; transform: translateX(-50%);">
           ${adminButtons}
@@ -403,11 +409,12 @@
     document.getElementById('treeCanvas').innerHTML = nodesHtml;
     drawLines(positions);
     
+    // Eventos toggle (editor/admin)
     if (currentRole === 'editor' || currentRole === 'admin') {
       document.querySelectorAll('.skill-node').forEach(node => {
         const skillId = node.dataset.id;
         const skill = allSkills.find(s => s.id === skillId);
-        if (skill.name === 'Creación del Gremio') return;
+        if (skill.name === 'Creación del Gremio') return; // la raíz no se puede desbloquear/bloquear
         node.addEventListener('click', async (e) => {
           if (e.target.closest('.node-admin-controls') || e.target.closest('.order-controls')) return;
           const currentlyUnlocked = isUnlocked(guildId, skillId);
@@ -426,6 +433,7 @@
       });
     }
     
+    // Admin: editar, eliminar y mover
     if (currentRole === 'admin') {
       document.querySelectorAll('.edit-skill').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); openSkillModal(btn.dataset.id); });
@@ -477,7 +485,35 @@
   async function openSkillModal(skillId = null) {
     const isEditing = !!skillId;
     const skill = isEditing ? allSkills.find(s => s.id === skillId) : null;
-    if (isEditing && skill.name === 'Creación del Gremio') return alert('No se puede editar la raíz');
+    const isRoot = skill && skill.name === 'Creación del Gremio';
+    
+    if (isEditing && isRoot) {
+      // Modal especial solo para editar icono y descripción de la raíz
+      const modalDiv = document.createElement('div');
+      modalDiv.className = 'modal';
+      modalDiv.innerHTML = `
+        <div class="modal-content">
+          <h3>Editar habilidad raíz</h3>
+          <textarea id="skillDesc" placeholder="Descripción">${skill ? escapeHtml(skill.description || '') : ''}</textarea>
+          <input type="text" id="skillIconUrl" placeholder="URL del icono" value="${skill ? escapeHtml(skill.icon_url || '') : ''}">
+          <button id="saveRootBtn">Guardar</button>
+          <button id="closeModalBtn">Cancelar</button>
+        </div>
+      `;
+      document.body.appendChild(modalDiv);
+      document.getElementById('closeModalBtn').onclick = () => modalDiv.remove();
+      document.getElementById('saveRootBtn').onclick = async () => {
+        const desc = document.getElementById('skillDesc').value;
+        const iconUrl = document.getElementById('skillIconUrl').value.trim();
+        await supabaseClient.from('skills').update({ description: desc, icon_url: iconUrl || null }).eq('id', skillId);
+        modalDiv.remove();
+        await loadAllData();
+      };
+      return;
+    }
+    
+    // Modal normal para otras habilidades (nuevas o edición no raíz)
+    if (isEditing && skill.name === 'Creación del Gremio') return; // por seguridad
     
     const possibleParents = allSkills.filter(s => {
       if (isEditing && s.id === skillId) return false;
@@ -593,7 +629,7 @@
   });
   document.getElementById('searchGuild').addEventListener('input', () => renderGuildList());
 
-  initTheme();   // Aplicar tema guardado o el oscuro por defecto
+  initTheme();
   loadAllData();
 </script>
 </body>
