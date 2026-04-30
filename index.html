@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Árbol de Habilidades - Gremios</title>
+  <link rel="icon" type="image/png" href="logo.png">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ========== VARIABLES CSS ========== */
+    /* ========== VARIABLES CSS (igual que antes) ========== */
     :root {
       --bg-body: #f1f5f9;
       --bg-sidebar: #ffffff;
@@ -93,11 +94,71 @@
     .order-controls button { background: none; border: none; cursor: pointer; font-size: 0.7rem; padding: 2px 4px; color: var(--text-primary); }
     svg.lines-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
     .add-skill-btn, .add-guild-btn { background: #10b981; color: white; border: none; padding: 0.5rem 1rem; border-radius: 2rem; cursor: pointer; font-weight: bold; }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-    .modal-content { background: var(--modal-bg); padding: 2rem; border-radius: 1.5rem; width: 450px; max-width: 90%; color: var(--text-primary); }
-    .modal-content input, .modal-content textarea, .modal-content select { width: 100%; margin: 0.5rem 0; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--input-border); background: var(--bg-card); color: var(--text-primary); }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: var(--modal-bg);
+      padding: 2rem;
+      border-radius: 1.5rem;
+      width: 400px;
+      max-width: 90%;
+      color: var(--text-primary);
+      box-shadow: 0 20px 35px -12px var(--shadow);
+    }
+    .modal-content h3 {
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+    .modal-content p {
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+    .modal-content input, .modal-content textarea, .modal-content select {
+      width: 100%;
+      margin: 0.5rem 0 1rem 0;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--input-border);
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .modal-buttons button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.1s;
+    }
+    .modal-buttons button.primary {
+      background: #3b82f6;
+      color: white;
+    }
+    .modal-buttons button.secondary {
+      background: var(--button-bg);
+      color: var(--button-text);
+    }
+    .modal-buttons button.danger {
+      background: #ef4444;
+      color: white;
+    }
     .hidden { display: none; }
-    /* Tooltip flotante */
     .floating-tooltip {
       position: fixed;
       background-color: var(--tooltip-bg);
@@ -120,7 +181,13 @@
     .floating-tooltip ul, .floating-tooltip ol { padding-left: 1.2rem; margin: 0.3rem 0; }
     .floating-tooltip li { margin: 0.2rem 0; }
     .floating-tooltip p { margin: 0.3rem 0; }
-    @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } .floating-tooltip { max-width: 200px; font-size: 0.7rem; } }
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; max-height: 40%; }
+      .skill-node img { width: 50px; height: 50px; }
+      .floating-tooltip { max-width: 200px; font-size: 0.7rem; }
+      .modal-content { width: 90%; padding: 1.5rem; }
+    }
   </style>
 </head>
 <body class="dark-mode">
@@ -155,12 +222,82 @@
 
 <script>
   // ========== CONFIGURACIÓN ==========
-  const SUPABASE_URL = 'https://gnallpleevvufdjscjw.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_SxAu4QAwLXs9iVBmDZoDJg_SPlOO4sf';
+  const SUPABASE_URL = 'https://ssbzppeqjwftczjpgnrj.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_8wwbu9Jbo0DXeNKIrS0doQ_GPnJAWXp';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // Salt secreto (DEBE COINCIDIR con el usado al generar los hashes en Supabase)
   const SECRET_SALT = 'Gremios2025!';
+
+  // ========== DIÁLOGOS PERSONALIZADOS ==========
+  function customAlert(message, title = "Aviso") {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>${title}</h3>
+          <p>${message}</p>
+          <div class="modal-buttons">
+            <button class="primary" id="alertOkBtn">Aceptar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById('alertOkBtn').onclick = () => {
+        modal.remove();
+        resolve();
+      };
+    });
+  }
+
+  function customConfirm(message, title = "Confirmar") {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>${title}</h3>
+          <p>${message}</p>
+          <div class="modal-buttons">
+            <button class="secondary" id="confirmNo">Cancelar</button>
+            <button class="primary" id="confirmYes">Aceptar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById('confirmYes').onclick = () => { modal.remove(); resolve(true); };
+      document.getElementById('confirmNo').onclick = () => { modal.remove(); resolve(false); };
+    });
+  }
+
+  function customPrompt(message, defaultValue = "", title = "Ingrese información") {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h3>${title}</h3>
+          <p>${message}</p>
+          <input type="text" id="promptInput" value="${defaultValue.replace(/"/g, '&quot;')}">
+          <div class="modal-buttons">
+            <button class="secondary" id="promptCancel">Cancelar</button>
+            <button class="primary" id="promptOk">Aceptar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const input = document.getElementById('promptInput');
+      input.focus();
+      document.getElementById('promptOk').onclick = () => { 
+        const val = input.value; 
+        modal.remove(); 
+        resolve(val);
+      };
+      document.getElementById('promptCancel').onclick = () => { 
+        modal.remove(); 
+        resolve(null);
+      };
+    });
+  }
 
   // ========== MODO OSCURO ==========
   function initTheme() {
@@ -203,7 +340,6 @@
     });
   }
 
-  // ========== FUNCIÓN PARA CALCULAR HASH CON SALT ==========
   async function hashPasswordWithSalt(password) {
     const encoder = new TextEncoder();
     const salted = SECRET_SALT + password;
@@ -213,15 +349,11 @@
     return `sha256$${hashHex}`;
   }
 
-  // ========== TOOLTIP FLOTANTE ==========
+  // ========== TOOLTIP (sin cambios) ==========
   let currentTooltip = null;
   let tooltipTimeout = null;
-
   function showTooltip(content, targetElement) {
-    if (currentTooltip) {
-      currentTooltip.remove();
-      currentTooltip = null;
-    }
+    if (currentTooltip) { currentTooltip.remove(); currentTooltip = null; }
     if (tooltipTimeout) clearTimeout(tooltipTimeout);
     const tooltip = document.createElement('div');
     tooltip.className = 'floating-tooltip';
@@ -232,30 +364,20 @@
     const tooltipRect = tooltip.getBoundingClientRect();
     let top = rect.bottom + 8;
     let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
-    if (top + tooltipRect.height > window.innerHeight) {
-      top = rect.top - tooltipRect.height - 8;
-    }
+    if (top + tooltipRect.height > window.innerHeight) top = rect.top - tooltipRect.height - 8;
     if (left < 8) left = 8;
-    if (left + tooltipRect.width > window.innerWidth - 8) {
-      left = window.innerWidth - tooltipRect.width - 8;
-    }
+    if (left + tooltipRect.width > window.innerWidth - 8) left = window.innerWidth - tooltipRect.width - 8;
     tooltip.style.top = `${top}px`;
     tooltip.style.left = `${left}px`;
     tooltip.style.opacity = '1';
   }
-
   function hideTooltip() {
-    if (currentTooltip) {
-      currentTooltip.remove();
-      currentTooltip = null;
-    }
+    if (currentTooltip) { currentTooltip.remove(); currentTooltip = null; }
   }
 
-  // ========== CARGAR DATOS ==========
+  // ========== CARGAR DATOS (sin raíz) ==========
   async function loadAllData() {
-    window.addEventListener('resize', () => {
-      if (currentGuildId) renderTree(currentGuildId);
-    });
+    window.addEventListener('resize', () => { if (currentGuildId) renderTree(currentGuildId); });
     const [guildsRes, skillsRes, guildSkillsRes] = await Promise.all([
       supabaseClient.from('guilds').select('*').order('name'),
       supabaseClient.from('skills').select('*').order('position', { ascending: true }),
@@ -268,31 +390,6 @@
     allGuilds = guildsRes.data || [];
     allSkills = skillsRes.data || [];
     guildSkills = guildSkillsRes.data || [];
-    
-    // Opcional: crear habilidad raíz si no existe (puedes comentar esta parte si no la quieres)
-    let rootSkill = allSkills.find(s => s.name === 'Creación del Gremio');
-    if (!rootSkill && (currentRole === 'admin' || currentRole === 'editor')) {
-      const { data: newRoot, error } = await supabaseClient.from('skills').insert({
-        name: 'Creación del Gremio',
-        description: 'Habilidad fundamental del gremio. Siempre desbloqueada.',
-        icon_url: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-        parent_id: null,
-        position: 0
-      }).select().single();
-      if (!error && newRoot) {
-        allSkills.push(newRoot);
-        rootSkill = newRoot;
-      }
-    }
-    if (rootSkill) {
-      for (let guild of allGuilds) {
-        const exists = guildSkills.some(gs => gs.guild_id === guild.id && gs.skill_id === rootSkill.id);
-        if (!exists) {
-          await supabaseClient.from('guild_skills').upsert({ guild_id: guild.id, skill_id: rootSkill.id, is_unlocked: true });
-          guildSkills.push({ guild_id: guild.id, skill_id: rootSkill.id, is_unlocked: true });
-        }
-      }
-    }
     
     renderGuildList();
     if (currentGuildId && !allGuilds.some(g => g.id === currentGuildId)) currentGuildId = null;
@@ -326,7 +423,8 @@
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const guildId = btn.dataset.id;
-          if (confirm('¿Eliminar gremio?')) {
+          const confirm = await customConfirm('¿Eliminar este gremio? Se perderán todos sus desbloqueos.', 'Eliminar gremio');
+          if (confirm) {
             await supabaseClient.from('guilds').delete().eq('id', guildId);
             await loadAllData();
           }
@@ -341,14 +439,13 @@
   }
 
   function canUnlock(guildId, skill) {
-    if (skill.name === 'Creación del Gremio') return true;
     if (!skill.parent_id) return true;
     const parentSkill = allSkills.find(s => s.id === skill.parent_id);
     if (!parentSkill) return true;
     return isUnlocked(guildId, parentSkill.id);
   }
 
-  // ========== POSICIONAMIENTO DE ÁRBOL ==========
+  // ========== POSICIONAMIENTO (igual) ==========
   function calculatePositions(rootSkills, startX = 400, startY = 80, levelGapX = 220, levelGapY = 130) {
     const childrenMap = new Map();
     allSkills.forEach(skill => {
@@ -360,10 +457,8 @@
     for (let [parent, children] of childrenMap.entries()) {
       children.sort((a,b) => (a.position || 0) - (b.position || 0));
     }
-    
     const roots = allSkills.filter(s => !s.parent_id);
     if (roots.length === 0) return new Map();
-    
     const positions = new Map();
     function dfs(skill, depth, offsetX) {
       const y = startY + depth * levelGapY;
@@ -382,7 +477,6 @@
         positions.set(skill.id, { x: centerX, y });
       }
     }
-    
     let globalOffset = startX;
     for (let root of roots) {
       dfs(root, 0, globalOffset);
@@ -397,31 +491,18 @@
     const container = document.getElementById('treeCanvas');
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.classList.add('lines-layer');
-    svg.style.position = 'absolute';
-    svg.style.top = 0;
-    svg.style.left = 0;
-    svg.style.width = '100%';
-    svg.style.height = '100%';
-    svg.style.pointerEvents = 'none';
-    
-    const parentOffset = 45;
-    const childOffset = 0;
-    
+    svg.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;';
+    const parentOffset = 45, childOffset = 0;
     for (let skill of allSkills) {
       if (!skill.parent_id) continue;
       const parentPos = positions.get(skill.parent_id);
       const childPos = positions.get(skill.id);
       if (!parentPos || !childPos) continue;
-      const x1 = parentPos.x;
-      const y1 = parentPos.y + parentOffset;
-      const x2 = childPos.x;
-      const y2 = childPos.y - childOffset;
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const cp1x = x1 + dx * 0.5;
-      const cp1y = y1;
-      const cp2x = x2 - dx * 0.5;
-      const cp2y = y2;
+      const x1 = parentPos.x, y1 = parentPos.y + parentOffset;
+      const x2 = childPos.x, y2 = childPos.y - childOffset;
+      const dx = x2 - x1, dy = y2 - y1;
+      const cp1x = x1 + dx*0.5, cp1y = y1;
+      const cp2x = x2 - dx*0.5, cp2y = y2;
       const d = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', d);
@@ -438,13 +519,11 @@
     if (!guildId) return;
     const guild = allGuilds.find(g => g.id === guildId);
     document.getElementById('currentGuildName').innerText = guild ? guild.name : 'Gremio';
-    
-    const positions = calculatePositions(allSkills.filter(s => !s.parent_id), 400, 80, 220, 130);
+    const positions = calculatePositions();
     if (positions.size === 0) {
       document.getElementById('treeCanvas').innerHTML = '<p>No hay habilidades. Crea una como administrador.</p>';
       return;
     }
-    
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
@@ -460,27 +539,18 @@
     const canvasHeight = (maxY - minY) + 2 * margin;
     const canvasOffsetX = minX - margin;
     const canvasOffsetY = minY - margin;
-    
     let nodesHtml = '';
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
       if (!pos) continue;
       const unlocked = isUnlocked(guildId, skill.id);
-      const lockedClass = (!unlocked && skill.name !== 'Creación del Gremio') ? 'locked' : '';
+      const lockedClass = (!unlocked) ? 'locked' : '';
       const iconUrl = skill.icon_url || 'https://cdn-icons-png.flaticon.com/512/1055/1055687.png';
       let adminButtons = '';
-      if (currentRole === 'admin' && skill.name !== 'Creación del Gremio') {
+      if (currentRole === 'admin') {
         adminButtons = `<div class="node-admin-controls">
           <button class="edit-skill" data-id="${skill.id}">✏️</button>
           <button class="delete-skill" data-id="${skill.id}">🗑️</button>
-        </div>`;
-      } else if (currentRole === 'admin' && skill.name === 'Creación del Gremio') {
-        adminButtons = `<div class="node-admin-controls">
-          <button class="edit-skill" data-id="${skill.id}">✏️</button>
-        </div>`;
-      } else if (currentRole === 'editor' && skill.name === 'Creación del Gremio') {
-        adminButtons = `<div class="node-admin-controls">
-          <button class="edit-skill" data-id="${skill.id}">✏️</button>
         </div>`;
       }
       let orderButtons = '';
@@ -496,7 +566,6 @@
       }
       const relX = pos.x - canvasOffsetX;
       const relY = pos.y - canvasOffsetY;
-      
       nodesHtml += `
         <div class="skill-node ${lockedClass}" data-id="${skill.id}" data-description="${escapeHtml(skill.description || 'Sin descripción').replace(/"/g, '&quot;')}" style="left: ${relX}px; top: ${relY}px; transform: translateX(-50%);">
           ${adminButtons}
@@ -506,21 +575,16 @@
         </div>
       `;
     }
-    
     const canvasDiv = document.getElementById('treeCanvas');
     canvasDiv.style.width = `${canvasWidth}px`;
     canvasDiv.style.height = `${canvasHeight}px`;
     canvasDiv.innerHTML = nodesHtml;
-    
     const relativePositions = new Map();
     for (let skill of allSkills) {
       const pos = positions.get(skill.id);
-      if (pos) {
-        relativePositions.set(skill.id, { x: pos.x - canvasOffsetX, y: pos.y - canvasOffsetY });
-      }
+      if (pos) relativePositions.set(skill.id, { x: pos.x - canvasOffsetX, y: pos.y - canvasOffsetY });
     }
     drawLines(relativePositions);
-    
     // Tooltips
     document.querySelectorAll('.skill-node').forEach(node => {
       node.removeEventListener('mouseenter', node._mouseEnterHandler);
@@ -534,71 +598,49 @@
       node._mouseEnterHandler = handlerEnter;
       node._mouseLeaveHandler = handlerLeave;
     });
-    
     // Eventos toggle (editor/admin)
     if (currentRole === 'editor' || currentRole === 'admin') {
       document.querySelectorAll('.skill-node').forEach(node => {
         const skillId = node.dataset.id;
         const skill = allSkills.find(s => s.id === skillId);
-        if (skill.name === 'Creación del Gremio') return;
         node.addEventListener('click', async (e) => {
           if (e.target.closest('.node-admin-controls') || e.target.closest('.order-controls')) return;
           const currentlyUnlocked = isUnlocked(guildId, skillId);
           const newState = !currentlyUnlocked;
           if (newState && !canUnlock(guildId, skill)) {
-            alert('Para desbloquear esta habilidad, primero debes desbloquear su padre.');
+            await customAlert('Para desbloquear esta habilidad, primero debes desbloquear su padre.', 'Requisito no cumplido');
             return;
           }
-          await supabaseClient.from('guild_skills').upsert({
-            guild_id: guildId,
-            skill_id: skillId,
-            is_unlocked: newState
-          });
+          await supabaseClient.from('guild_skills').upsert({ guild_id: guildId, skill_id: skillId, is_unlocked: newState });
           await loadAllData();
         });
       });
     }
-    
-    // Admin y editor pueden editar habilidades (incluyendo la raíz)
-    if (currentRole === 'admin' || currentRole === 'editor') {
+    // Solo admin puede editar/eliminar/mover
+    if (currentRole === 'admin') {
       document.querySelectorAll('.edit-skill').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); openSkillModal(btn.dataset.id); });
       });
-      // Solo admin puede eliminar habilidades (no editor)
-      if (currentRole === 'admin') {
-        document.querySelectorAll('.delete-skill').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const skillId = btn.dataset.id;
-            const skill = allSkills.find(s => s.id === skillId);
-            if (skill.name === 'Creación del Gremio') return alert('No se puede eliminar la raíz');
-            if (confirm('¿Eliminar habilidad? Se eliminarán también sus descendientes.')) {
-              await supabaseClient.from('skills').delete().eq('id', skillId);
-              await loadAllData();
-            }
-          });
+      document.querySelectorAll('.delete-skill').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const skillId = btn.dataset.id;
+          const confirm = await customConfirm('¿Eliminar esta habilidad? También se eliminarán sus descendientes.', 'Eliminar habilidad');
+          if (confirm) {
+            await supabaseClient.from('skills').delete().eq('id', skillId);
+            await loadAllData();
+          }
         });
-      }
-      // Reordenamiento solo admin
-      if (currentRole === 'admin') {
-        document.querySelectorAll('.move-up').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const skillId = btn.dataset.id;
-            await moveSkill(skillId, -1);
-          });
-        });
-        document.querySelectorAll('.move-down').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const skillId = btn.dataset.id;
-            await moveSkill(skillId, 1);
-          });
-        });
-      }
+      });
+      document.querySelectorAll('.move-up').forEach(btn => {
+        btn.addEventListener('click', async (e) => { e.stopPropagation(); await moveSkill(btn.dataset.id, -1); });
+      });
+      document.querySelectorAll('.move-down').forEach(btn => {
+        btn.addEventListener('click', async (e) => { e.stopPropagation(); await moveSkill(btn.dataset.id, 1); });
+      });
     }
   }
-  
+
   async function moveSkill(skillId, delta) {
     const skill = allSkills.find(s => s.id === skillId);
     if (!skill || !skill.parent_id) return;
@@ -614,18 +656,14 @@
     await loadAllData();
   }
 
-  // ========== MODAL HABILIDAD (raíz totalmente editable) ==========
   async function openSkillModal(skillId = null) {
     const isEditing = !!skillId;
     const skill = isEditing ? allSkills.find(s => s.id === skillId) : null;
-    const isRoot = skill && skill.name === 'Creación del Gremio';
-    
     const possibleParents = allSkills.filter(s => {
       if (isEditing && s.id === skillId) return false;
       if (isEditing && isDescendant(s.id, skillId)) return false;
       return true;
     });
-    
     const modalDiv = document.createElement('div');
     modalDiv.className = 'modal';
     modalDiv.innerHTML = `
@@ -635,12 +673,14 @@
         <textarea id="skillDesc" placeholder="Descripción (puedes usar HTML: &lt;b&gt;negrita&lt;/b&gt;, &lt;br&gt;, &lt;ul&gt;&lt;li&gt;lista&lt;/li&gt;&lt;/ul&gt;, etc.)">${skill ? (skill.description || '') : ''}</textarea>
         <input type="text" id="skillIconUrl" placeholder="URL del icono" value="${skill ? escapeHtml(skill.icon_url || '') : ''}">
         <label>Habilidad padre (prerrequisito):</label>
-        <select id="parentSelect" ${isRoot ? 'disabled' : ''}>
-          <option value="">-- Ninguno (solo raíz) --</option>
+        <select id="parentSelect">
+          <option value="">-- Ninguno (habilidad raíz) --</option>
           ${possibleParents.map(p => `<option value="${p.id}" ${skill && skill.parent_id === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
         </select>
-        <button id="saveSkillBtn">Guardar</button>
-        <button id="closeModalBtn">Cancelar</button>
+        <div class="modal-buttons">
+          <button class="secondary" id="closeModalBtn">Cancelar</button>
+          <button class="primary" id="saveSkillBtn">Guardar</button>
+        </div>
       </div>
     `;
     document.body.appendChild(modalDiv);
@@ -650,12 +690,12 @@
       const desc = document.getElementById('skillDesc').value;
       const iconUrl = document.getElementById('skillIconUrl').value.trim();
       const parentId = document.getElementById('parentSelect').value || null;
-      if (!name) return alert('El nombre es obligatorio');
+      if (!name) {
+        await customAlert('El nombre es obligatorio', 'Error');
+        return;
+      }
       if (isEditing) {
-        const updateData = { name, description: desc, icon_url: iconUrl || null };
-        if (!isRoot) {
-          updateData.parent_id = parentId;
-        }
+        const updateData = { name, description: desc, icon_url: iconUrl || null, parent_id: parentId };
         await supabaseClient.from('skills').update(updateData).eq('id', skillId);
       } else {
         let newPosition = 0;
@@ -664,13 +704,13 @@
           newPosition = siblings.length;
         }
         const { error } = await supabaseClient.from('skills').insert({ name, description: desc, icon_url: iconUrl || null, parent_id: parentId, position: newPosition });
-        if (error) alert(error.message);
+        if (error) await customAlert(error.message, 'Error');
       }
       modalDiv.remove();
       await loadAllData();
     };
   }
-  
+
   function isDescendant(possibleAncestorId, skillId) {
     let current = allSkills.find(s => s.id === possibleAncestorId);
     while (current && current.parent_id) {
@@ -682,59 +722,49 @@
 
   async function createGuild() {
     if (currentRole !== 'admin' && currentRole !== 'editor') {
-      alert('Debes estar en modo Editor o Administrador para crear gremios.');
+      await customAlert('Debes estar en modo Editor o Administrador para crear gremios.', 'Permiso denegado');
       return;
     }
-    const name = prompt('Nombre del gremio:');
+    const name = await customPrompt('Nombre del nuevo gremio:', '', 'Crear gremio');
     if (!name) return;
-    const { data: newGuild, error } = await supabaseClient.from('guilds').insert({ name }).select().single();
-    if (error) alert(error.message);
-    else {
-      const rootSkill = allSkills.find(s => s.name === 'Creación del Gremio');
-      if (rootSkill) await supabaseClient.from('guild_skills').upsert({ guild_id: newGuild.id, skill_id: rootSkill.id, is_unlocked: true });
-      await loadAllData();
-    }
+    const { error } = await supabaseClient.from('guilds').insert({ name });
+    if (error) await customAlert(error.message, 'Error');
+    else await loadAllData();
   }
 
-  // ========== AUTENTICACIÓN CON HASH + SALT ==========
+  // ========== AUTENTICACIÓN ==========
   async function authenticate(role) {
-    const password = prompt(`Ingrese la contraseña de ${role === 'admin' ? 'Administrador' : 'Editor'}:`);
-    if (!password) return false;
-    
-    // Obtener el hash almacenado desde Supabase
+    const password = await customPrompt(`Ingrese la contraseña de ${role === 'admin' ? 'Administrador' : 'Editor'}:`, '', 'Acceso');
+    if (password === null) return false;
     const { data, error } = await supabaseClient.from('app_secrets').select('value').eq('key', `${role}_password`).single();
     if (error || !data) {
-      alert('Error al verificar la contraseña.');
+      await customAlert('Error al verificar la contraseña.', 'Error');
       return false;
     }
-    
     const storedHash = data.value;
     const computedHash = await hashPasswordWithSalt(password);
-    
     if (storedHash === computedHash) {
       currentRole = role;
       document.getElementById('adminModeBtn').classList.toggle('admin-active', role === 'admin');
       document.getElementById('editorModeBtn').classList.toggle('editor-active', role === 'editor');
       document.body.classList.remove('admin-mode', 'editor-mode');
       if (role === 'admin') document.body.classList.add('admin-mode');
-      
       const addGuildBtn = document.getElementById('addGuildBtn');
       const newSkillBtn = document.getElementById('newSkillBtn');
       const adminActions = document.getElementById('adminGuildActions');
-      
       if (role === 'admin') {
         addGuildBtn.classList.remove('hidden');
         newSkillBtn.classList.remove('hidden');
         adminActions.classList.remove('hidden');
-      } else if (role === 'editor') {
+      } else {
         addGuildBtn.classList.remove('hidden');
-        newSkillBtn.classList.remove('hidden');
+        newSkillBtn.classList.add('hidden');
         adminActions.classList.add('hidden');
       }
       await loadAllData();
       return true;
     } else {
-      alert('Contraseña incorrecta.');
+      await customAlert('Contraseña incorrecta.', 'Acceso denegado');
       return false;
     }
   }
@@ -745,7 +775,10 @@
   document.getElementById('addGuildBtn').addEventListener('click', createGuild);
   document.getElementById('newSkillBtn').addEventListener('click', () => openSkillModal(null));
   document.getElementById('saveGuildNameBtn').addEventListener('click', async () => {
-    if (currentRole !== 'admin') return alert('Solo admin puede renombrar gremios');
+    if (currentRole !== 'admin') {
+      await customAlert('Solo el administrador puede renombrar gremios.', 'Permiso denegado');
+      return;
+    }
     const newName = document.getElementById('editGuildNameInput').value.trim();
     if (!newName || !currentGuildId) return;
     await supabaseClient.from('guilds').update({ name: newName }).eq('id', currentGuildId);
