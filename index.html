@@ -78,7 +78,7 @@
       border-radius: 2rem;
       padding: 1rem;
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: auto;
       flex: 1;
       min-height: 0;
     }
@@ -105,7 +105,7 @@
       border: 1px solid var(--tooltip-border);
       border-radius: 12px;
       padding: 10px 14px;
-      max-width: 1600px;
+      max-width: 400px;
       min-width: 180px;
       font-size: 0.8rem;
       line-height: 1.4;
@@ -120,7 +120,7 @@
     .floating-tooltip ul, .floating-tooltip ol { padding-left: 1.2rem; margin: 0.3rem 0; }
     .floating-tooltip li { margin: 0.2rem 0; }
     .floating-tooltip p { margin: 0.3rem 0; }
-    @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } .floating-tooltip { max-width: 1600px; font-size: 0.7rem; } }
+    @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; max-height: 40%; } .skill-node img { width: 50px; height: 50px; } .floating-tooltip { max-width: 200px; font-size: 0.7rem; } }
   </style>
 </head>
 <body class="dark-mode">
@@ -155,9 +155,12 @@
 
 <script>
   // ========== CONFIGURACIÓN ==========
-  const SUPABASE_URL = 'https://ssbzppeqjwftczjpgnrj.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_8wwbu9Jbo0DXeNKIrS0doQ_GPnJAWXp';
+  const SUPABASE_URL = 'https://gnallpleevvufdjscjw.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_SxAu4QAwLXs9iVBmDZoDJg_SPlOO4sf';
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Salt secreto (DEBE COINCIDIR con el usado al generar los hashes en Supabase)
+  const SECRET_SALT = 'Gremios2025!';
 
   // ========== MODO OSCURO ==========
   function initTheme() {
@@ -198,6 +201,16 @@
       if (m === '>') return '&gt;';
       return m;
     });
+  }
+
+  // ========== FUNCIÓN PARA CALCULAR HASH CON SALT ==========
+  async function hashPasswordWithSalt(password) {
+    const encoder = new TextEncoder();
+    const salted = SECRET_SALT + password;
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(salted));
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `sha256$${hashHex}`;
   }
 
   // ========== TOOLTIP FLOTANTE ==========
@@ -256,6 +269,7 @@
     allSkills = skillsRes.data || [];
     guildSkills = guildSkillsRes.data || [];
     
+    // Opcional: crear habilidad raíz si no existe (puedes comentar esta parte si no la quieres)
     let rootSkill = allSkills.find(s => s.name === 'Creación del Gremio');
     if (!rootSkill && (currentRole === 'admin' || currentRole === 'editor')) {
       const { data: newRoot, error } = await supabaseClient.from('skills').insert({
@@ -461,12 +475,10 @@
           <button class="delete-skill" data-id="${skill.id}">🗑️</button>
         </div>`;
       } else if (currentRole === 'admin' && skill.name === 'Creación del Gremio') {
-        // También permitir editar la raíz (admin)
         adminButtons = `<div class="node-admin-controls">
           <button class="edit-skill" data-id="${skill.id}">✏️</button>
         </div>`;
       } else if (currentRole === 'editor' && skill.name === 'Creación del Gremio') {
-        // El editor también puede editar la raíz
         adminButtons = `<div class="node-admin-controls">
           <button class="edit-skill" data-id="${skill.id}">✏️</button>
         </div>`;
@@ -523,7 +535,7 @@
       node._mouseLeaveHandler = handlerLeave;
     });
     
-    // Eventos toggle
+    // Eventos toggle (editor/admin)
     if (currentRole === 'editor' || currentRole === 'admin') {
       document.querySelectorAll('.skill-node').forEach(node => {
         const skillId = node.dataset.id;
@@ -602,7 +614,7 @@
     await loadAllData();
   }
 
-  // ========== MODAL HABILIDAD (ahora la raíz es totalmente editable) ==========
+  // ========== MODAL HABILIDAD (raíz totalmente editable) ==========
   async function openSkillModal(skillId = null) {
     const isEditing = !!skillId;
     const skill = isEditing ? allSkills.find(s => s.id === skillId) : null;
@@ -625,7 +637,7 @@
         <label>Habilidad padre (prerrequisito):</label>
         <select id="parentSelect" ${isRoot ? 'disabled' : ''}>
           <option value="">-- Ninguno (solo raíz) --</option>
-          ${possibleParents.map(s => `<option value="${s.id}" ${skill && skill.parent_id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+          ${possibleParents.map(p => `<option value="${p.id}" ${skill && skill.parent_id === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
         </select>
         <button id="saveSkillBtn">Guardar</button>
         <button id="closeModalBtn">Cancelar</button>
@@ -640,7 +652,6 @@
       const parentId = document.getElementById('parentSelect').value || null;
       if (!name) return alert('El nombre es obligatorio');
       if (isEditing) {
-        // Para la raíz, permitimos cambiar nombre, descripción e icono, pero no el padre
         const updateData = { name, description: desc, icon_url: iconUrl || null };
         if (!isRoot) {
           updateData.parent_id = parentId;
@@ -670,7 +681,6 @@
   }
 
   async function createGuild() {
-    // Ahora tanto admin como editor pueden crear gremios
     if (currentRole !== 'admin' && currentRole !== 'editor') {
       alert('Debes estar en modo Editor o Administrador para crear gremios.');
       return;
@@ -686,13 +696,22 @@
     }
   }
 
-  // ========== AUTENTICACIÓN ==========
+  // ========== AUTENTICACIÓN CON HASH + SALT ==========
   async function authenticate(role) {
-    const password = prompt(`Contraseña de ${role === 'admin' ? 'Administrador' : 'Editor'}:`);
+    const password = prompt(`Ingrese la contraseña de ${role === 'admin' ? 'Administrador' : 'Editor'}:`);
     if (!password) return false;
+    
+    // Obtener el hash almacenado desde Supabase
     const { data, error } = await supabaseClient.from('app_secrets').select('value').eq('key', `${role}_password`).single();
-    if (error || !data) { alert('Error'); return false; }
-    if (password === data.value) {
+    if (error || !data) {
+      alert('Error al verificar la contraseña.');
+      return false;
+    }
+    
+    const storedHash = data.value;
+    const computedHash = await hashPasswordWithSalt(password);
+    
+    if (storedHash === computedHash) {
       currentRole = role;
       document.getElementById('adminModeBtn').classList.toggle('admin-active', role === 'admin');
       document.getElementById('editorModeBtn').classList.toggle('editor-active', role === 'editor');
@@ -708,14 +727,14 @@
         newSkillBtn.classList.remove('hidden');
         adminActions.classList.remove('hidden');
       } else if (role === 'editor') {
-        addGuildBtn.classList.remove('hidden');      // Editor puede crear gremios
-        newSkillBtn.classList.remove('hidden');     // Editor puede crear habilidades
-        adminActions.classList.add('hidden');       // No puede renombrar gremios
+        addGuildBtn.classList.remove('hidden');
+        newSkillBtn.classList.remove('hidden');
+        adminActions.classList.add('hidden');
       }
       await loadAllData();
       return true;
     } else {
-      alert('Contraseña incorrecta');
+      alert('Contraseña incorrecta.');
       return false;
     }
   }
